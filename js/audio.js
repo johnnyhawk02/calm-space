@@ -3,8 +3,12 @@
  *
  * Signal path (everything is capped, so it can never get loud or harsh):
  *
- *   voices ─▶ steal gain ─▶ pan ─▶ bus(0.5) ─┬─▶ tone LPF ─▶ compressor ─▶ master ─▶ limiter ─▶ out
- *                                             └─▶ reverb send ─▶ convolver ─┘
+ *   voices ─▶ steal gain ─▶ pan ─▶ bus(0.5) ─▶ wobble ─┬─▶ dry ──────────────┐
+ *                                                     ├─▶ shimmer (chorus) ─┤
+ *                                                     ├─▶ echo (feedback) ──┼─▶ warmth LPF ─▶ sparkle shelf ─▶ compressor ─▶ master ─▶ limiter ─▶ out
+ *                                                     └─▶ space (reverb) ───┘
+ *
+ * The effects are driven by the three per-scene sound sliders (setFx).
  *
  * - A fixed voice pool (voice stealing) limits simultaneous one-shot notes.
  *   Stolen voices fade out over ~40 ms through their own "steal" gain stage,
@@ -34,6 +38,7 @@ export class AudioEngine {
     this.voices = [];
     this.pads = new Set();
     this.ambient = null;
+    this.fx = {}; this.pitchShift = 0; this.ringMul = 1; this.sparkle = 0;
   }
 
   // ---- lifecycle ----------------------------------------------------------
@@ -62,7 +67,24 @@ export class AudioEngine {
   _build() {
     const c = this.ctx;
     this.bus = c.createGain(); this.bus.gain.value = 0.5;
-    this.tone = c.createBiquadFilter(); this.tone.type = 'lowpass'; this.tone.frequency.value = 7000; this.tone.Q.value = 0.4;
+    // --- sound-slider effects (all start neutral; see setFx) -----------------
+    this.trem = c.createGain(); this.trem.gain.value = 1;            // wobble (tremolo)
+    this.tremLfo = c.createOscillator(); this.tremLfo.frequency.value = 2.6;
+    this.tremDepth = c.createGain(); this.tremDepth.gain.value = 0;
+    this.tremLfo.connect(this.tremDepth); this.tremDepth.connect(this.trem.gain); this.tremLfo.start();
+    this.dry = c.createGain(); this.dry.gain.value = 1;
+    this.chorus = c.createDelay(0.1); this.chorus.delayTime.value = 0.022; // shimmer (chorus)
+    this.chorusLfo = c.createOscillator(); this.chorusLfo.frequency.value = 0.35;
+    this.chorusDepth = c.createGain(); this.chorusDepth.gain.value = 0;
+    this.chorusLfo.connect(this.chorusDepth); this.chorusDepth.connect(this.chorus.delayTime); this.chorusLfo.start();
+    this.chorusWet = c.createGain(); this.chorusWet.gain.value = 0;
+    this.echo = c.createDelay(2.0); this.echo.delayTime.value = 0.38;  // echo (feedback delay)
+    this.echoLp = c.createBiquadFilter(); this.echoLp.type = 'lowpass'; this.echoLp.frequency.value = 2600; // each repeat gets softer/darker
+    this.echoFb = c.createGain(); this.echoFb.gain.value = 0;
+    this.echoWet = c.createGain(); this.echoWet.gain.value = 0;
+    this.shelf = c.createBiquadFilter(); this.shelf.type = 'highshelf'; this.shelf.frequency.value = 4500; this.shelf.gain.value = 0; // sparkle
+    // --- mastering --------------------------------------------------------
+    this.tone = c.createBiquadFilter(); this.tone.type = 'lowpass'; this.tone.frequency.value = 7000; this.tone.Q.value = 0.4; // warmth
     this.comp = c.createDynamicsCompressor();
     this.comp.threshold.value = -20; this.comp.knee.value = 20; this.comp.ratio.value = 8;
     this.comp.attack.value = 0.005; this.comp.release.value = 0.3;
@@ -75,11 +97,46 @@ export class AudioEngine {
     this.reverb = c.createConvolver();
     this.reverb.buffer = this._impulse(2.6);
 
-    this.bus.connect(this.tone);
-    this.bus.connect(this.revSend); this.revSend.connect(this.reverb); this.reverb.connect(this.tone);
-    this.tone.connect(this.comp); this.comp.connect(this.master);
+    this.bus.connect(this.trem);
+    this.trem.connect(this.dry); this.dry.connect(this.tone);
+    this.trem.connect(this.chorus); this.chorus.connect(this.chorusWet); this.chorusWet.connect(this.tone);
+    this.trem.connect(this.echo); this.echo.connect(this.echoLp); this.echoLp.connect(this.echoFb); this.echoFb.connect(this.echo);
+    this.echoLp.connect(this.echoWet); this.echoWet.connect(this.tone);
+    this.trem.connect(this.revSend); this.revSend.connect(this.reverb); this.reverb.connect(this.tone);
+    this.tone.connect(this.shelf); this.shelf.connect(this.comp); this.comp.connect(this.master);
     this.master.connect(this.limiter); this.limiter.connect(c.destination);
     this._applyMaster(0.4);
+    this.setFx(this.fx);
+  }
+
+  /**
+   * Sound-slider effects. Every value is 0..1; missing keys go back to neutral.
+   * All ranges are capped (echo feedback ≤ 0.6, sparkle ≤ +5 dB, wobble ≤ 45 %)
+   * and everything still passes through the compressor and limiter.
+   *   echo    feedback delay (wet + repeats)   echoTime  seconds between repeats
+   *   space   reverb amount                    shimmer   slow chorus
+   *   warmth  low-pass (darker, softer)        sparkle   gentle high shelf + brighter bells
+   *   wobble  slow tremolo                     pitch     shifts every note by up to ±1 octave (in scale steps)
+   *   ring    how long bells ring (0.5×–2.5×)
+   */
+  setFx(fx = {}) {
+    const f = { echo: 0, echoTime: 0.38, space: 0.3, shimmer: 0, warmth: 0, sparkle: 0, wobble: 0, pitch: 0.5, ring: 0.25, ...fx };
+    this.fx = f;
+    this.pitchShift = Math.round((f.pitch - 0.5) * 10);
+    this.ringMul = 0.5 + f.ring * 2.0;
+    this.sparkle = f.sparkle;
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime, tc = 0.08;
+    this.echo.delayTime.setTargetAtTime(f.echoTime, t, 0.2);
+    this.echoWet.gain.setTargetAtTime(0.5 * f.echo, t, tc);
+    this.echoFb.gain.setTargetAtTime(f.echo > 0.001 ? 0.12 + 0.48 * f.echo : 0, t, tc);
+    this.revSend.gain.setTargetAtTime(0.05 + 0.9 * f.space, t, tc);
+    this.chorusWet.gain.setTargetAtTime(0.6 * f.shimmer, t, tc);
+    this.chorusDepth.gain.setTargetAtTime(0.006 * f.shimmer, t, tc);
+    this.dry.gain.setTargetAtTime(1 - 0.25 * f.shimmer, t, tc);
+    this.tone.frequency.setTargetAtTime(7000 * Math.pow(1 - f.warmth, 2.2) + 450, t, tc);
+    this.shelf.gain.setTargetAtTime(5 * f.sparkle, t, tc);
+    this.tremDepth.gain.setTargetAtTime(0.45 * f.wobble, t, tc);
   }
 
   /** Procedural stereo reverb impulse: smoothed decaying noise (a soft, roomy tail). */
@@ -112,6 +169,7 @@ export class AudioEngine {
 
   /** Frequency of integer scale step (0 = C3). Works for any step, incl. negatives. */
   freq(step) {
+    step += this.pitchShift; // the 'pitch' sound slider moves along the same scale
     const n = this.scale.length;
     const oct = Math.floor(step / n);
     const deg = ((step % n) + n) % n;
@@ -174,6 +232,7 @@ export class AudioEngine {
   /** Soft FM bell/chime. vel 0..1 → volume, bright 0..1 → FM index (timbre). */
   chime(f, vel = 0.5, pan = 0, bright = 0.5, decay = 1.6) {
     if (!this._ok()) return;
+    decay *= this.ringMul; bright = Math.min(1, bright + this.sparkle * 0.35);
     const c = this.ctx, t = c.currentTime + 0.005, dur = decay * 2.2;
     const v = this._voice(dur, pan);
     const car = this._osc(v, 'sine', f);

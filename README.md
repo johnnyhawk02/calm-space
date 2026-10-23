@@ -17,6 +17,33 @@ It is a Progressive Web App: plain HTML and ES modules, no build step, with one 
 | 7 | Chime Waterfall | Touch to drop a bead, hold to pour beads, drag sideways to tilt the board. | Each peg rings a note from its column (a music box). |
 | 8 | Kaleidoscope | Paint shapes that are mirrored into 6 to 12 turning segments and fade over about 10 s. | Bells pitched by distance from the centre. |
 
+### Sound sliders
+
+Each scene has **three large vertical sliders on the right-hand side** that change its sound, and every scene has its own set. Moving a slider plays a soft preview bell so the change is heard at once. Values are saved per scene. The panel dims after 4 s and wakes when touched. Parents can hide it in settings ("Show the 3 sound sliders on the right").
+
+| Scene | Sliders (top to bottom) |
+|-------|-------------------------|
+| Disc Field | Echo · Shimmer · Pitch |
+| Jelly Blob | Wobble · Warmth · Pitch |
+| Star Swarm | Space · Echo · Sparkle |
+| Ripple Pond | Echo · Space · Shimmer |
+| Silk Ribbons | Warmth · Wobble · Space |
+| Gravity Garden | Echo · Pitch · Sparkle |
+| Chime Waterfall | Echo · Ring length · Pitch |
+| Kaleidoscope | Echo · Shimmer · Space |
+
+What each effect does:
+- **Echo:** soft, darkening repeats. The spacing is set per scene, and feedback is capped at 0.6.
+- **Space:** reverb amount.
+- **Shimmer:** a slow chorus.
+- **Warmth:** a low-pass filter, for a softer sound.
+- **Sparkle:** a gentle +5 dB high shelf at most, plus brighter bells.
+- **Wobble:** a slow 2.6 Hz tremolo.
+- **Pitch:** moves every note by up to an octave, along the same pentatonic scale, so it always stays in tune.
+- **Ring length:** how long bells ring, from 0.5× to 2.5×.
+
+All effects sit before the compressor and limiter, so nothing can get loud or harsh.
+
 Each scene has a gentle idle state, so it looks alive when nobody is touching it. The header of each scene file explains its physics and sound design.
 
 ## Run locally
@@ -114,6 +141,7 @@ The app was tested in headless Chromium (software WebGL) at iPad sizes 1180×820
 - **Idle sounds:** only Chime Waterfall makes sound when untouched (an occasional quiet bead about every 3 s, played at under half volume), because the gentle trickle is the point of that scene. Every other idle state is silent.
 - **Touch pressure:** iPad finger touches don't report real pressure, so it is treated as medium. An Apple Pencil does deepen Jelly Blob dents.
 - **Vendored Three.js** is the official minified ES-module build (about 690 KB), saved as `vendor/three.module.js` to keep the download small. Everything else is about 210 KB in total, icons included.
+- **Sound sliders** are custom vertical sliders rather than `<input type=range>`. Vertical range inputs are unreliable in iPad Safari, and the custom version gives a 64 px wide touch target with a 34 px thumb. They are labelled with icons rather than text, and are keyboard and VoiceOver accessible (`role=slider`, arrow keys).
 - No dependencies were added beyond Three.js.
 
 ## Known limitations
