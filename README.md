@@ -4,7 +4,7 @@ A calm, tactile 3D sensory app for iPad, made for autistic and neurodivergent ch
 
 It is a Progressive Web App: plain HTML and ES modules, no build step, with one dependency (Three.js r170, vendored). It works fully offline after the first load.
 
-## The 8 scenes
+## The 9 scenes
 
 | # | Scene | Touch | Sound |
 |---|-------|-------|-------|
@@ -12,10 +12,11 @@ It is a Progressive Web App: plain HTML and ES modules, no build step, with one 
 | 2 | Jelly Blob | Poke to dent it, pinch with two fingers to squish it, touch beside it and it leans towards you. | Low "squish" tones, a soft bloop on release and a warm pad while pinching. |
 | 3 | Star Swarm | Thousands of stars flock to each finger and swirl around it. Each finger has its own colour. Let go and they drift apart. | A shimmering pad that swells with the swarm's speed. |
 | 4 | Ripple Pond | Tap or drag to make spreading rings. Hold still and a slow ring keeps pulsing. Lily pads and gems bob on the waves. | Water drops, pitched by position. |
-| 5 | Silk Ribbons | Each finger draws a twisting rainbow ribbon that keeps flowing and fades over about 6 s. | Each ribbon has a warm pad that follows its speed. |
+| 5 | Squishy Clay | A soft ball of clay. Prod it to squish it, hold to press a dimple in, and drag to pull lumps out. Held shapes stay moulded. Turn it with the arrow buttons on the left (or drag around it), and the round button makes it a ball again. | Low squish tones, plus a warm pad that climbs the scale as you stretch it. Letting go gives a soft bloop. |
 | 6 | Gravity Garden | Hold one finger to make a gravity well that gems spiral into. Hold two or more fingers to push them away. | Soft clinks when gems meet, plus a low hum from each well. |
 | 7 | Chime Waterfall | Touch to drop a bead, hold to pour beads, drag sideways to tilt the board. | Each peg rings a note from its column (a music box). |
 | 8 | Kaleidoscope | Paint shapes that are mirrored into 6 to 12 turning segments and fade over about 10 s. | Bells pitched by distance from the centre. |
+| 9 | Squishy Mirror | The front camera's picture becomes soft jelly. Drag to pull and smear it, hold still to make a magnifying bulge, and let go to watch it wobble back. Without a camera it uses a soft colourful pattern. | Squish tones and a stretching pad, like the clay. |
 
 ### Sound sliders
 
@@ -27,10 +28,11 @@ Each scene has **three large vertical sliders on the right-hand side** that chan
 | Jelly Blob | Wobble · Warmth · Pitch |
 | Star Swarm | Space · Echo · Sparkle |
 | Ripple Pond | Echo · Space · Shimmer |
-| Silk Ribbons | Warmth · Wobble · Space |
+| Squishy Clay | Wobble · Echo · Pitch |
 | Gravity Garden | Echo · Pitch · Sparkle |
 | Chime Waterfall | Echo · Ring length · Pitch |
 | Kaleidoscope | Echo · Shimmer · Space |
+| Squishy Mirror | Wobble · Warmth · Pitch |
 
 What each effect does:
 - **Echo:** soft, darkening repeats. The spacing is set per scene, and feedback is capped at 0.6.
@@ -89,7 +91,8 @@ To test on a real iPad on the same Wi-Fi, open `http://<your-computer-ip>:8080`.
   - **Lock to this scene**, which hides the scene buttons
   - **Wind down**: after 5, 10, 15 or 20 minutes, the screen slowly dims and the sound quietens over 2 minutes, then stays calm and dim. It never stops suddenly.
 - **Mute:** the speaker button in the top-right corner is always available.
-- **Scene buttons:** the bar fades away after 4 s. Tap near the bottom edge to bring it back.
+- **Scene buttons:** the bar stays visible by default. To have it fade after 4 s, turn on "Auto-hide the scene buttons" in settings. Then a tap near the bottom edge brings it back.
+- **Camera (Squishy Mirror):** the camera is only switched on while that scene is open. iPadOS asks for permission the first time. The picture stays on the iPad: it is never recorded, saved or uploaded. If you refuse permission, the scene uses a colourful pattern instead.
 - **Guided Access is the best way to keep a child inside the app.** Turn it on in Settings › Accessibility › Guided Access, open Calm Space, and triple-click the side (or Home) button. You can also disable areas of the screen, such as the settings dot.
 - Settings and the last scene are saved on the device in localStorage.
 - If the iPad has **Reduce Motion** turned on, every scene moves more slowly, camera drift is switched off, and there are fewer particles.
@@ -122,9 +125,9 @@ Every scene implements `init(renderer, audio, settings)`, `update(dt, time)`, `o
 ## Testing that was done
 
 The app was tested in headless Chromium (software WebGL) at iPad sizes 1180×820 and 820×1180, with multitouch simulated through Chrome DevTools touch events:
-- All 8 scenes load, respond to two-finger drags, taps and holds, and make sound, with **0 console errors** in both orientations, in all three themes, and with Reduce Motion on.
-- **Memory:** after cycling through all 8 scenes 5 times, GPU resources return to exactly the baseline (2 geometries, 0 textures, 2 programs, 0 audio pads). The JS heap levels off at about 6.2 to 6.4 MB, with roughly +0.05 MB per cycle by the end, which looks like JIT/cache warm-up rather than a leak.
-- **Offline:** with the network turned off, the app reloads and all 8 scenes load from the service-worker cache.
+- All scenes load, respond to two-finger drags, taps and holds, and make sound, with **0 console errors** in both orientations, in all three themes, and with Reduce Motion on.
+- **Memory:** after cycling through all scenes several times, GPU resources return to exactly the baseline (2 geometries, 0 textures, 2 programs, 0 audio pads). The JS heap levels off at about 6.2 to 6.4 MB, with roughly +0.05 MB per cycle by the end, which looks like JIT/cache warm-up rather than a leak.
+- **Offline:** with the network turned off, the app reloads and all scenes load from the service-worker cache.
 - **CPU cost per frame** (`update()` with two fingers down, desktop CPU): 0.6 ms at most (Star Swarm), and under 0.4 ms for every other scene. That leaves plenty of headroom inside the 16.7 ms frame budget on an A13 iPad.
 - The settings hold (stays closed at 1.5 s, opens at 3 s, a short tap does nothing), nav auto-hide and bottom-edge reveal, and settings persistence were all checked.
 
@@ -142,6 +145,8 @@ The app was tested in headless Chromium (software WebGL) at iPad sizes 1180×820
 - **Touch pressure:** iPad finger touches don't report real pressure, so it is treated as medium. An Apple Pencil does deepen Jelly Blob dents.
 - **Vendored Three.js** is the official minified ES-module build (about 690 KB), saved as `vendor/three.module.js` to keep the download small. Everything else is about 210 KB in total, icons included.
 - **Sound sliders** are custom vertical sliders rather than `<input type=range>`. Vertical range inputs are unreliable in iPad Safari, and the custom version gives a 64 px wide touch target with a 34 px thumb. They are labelled with icons rather than text, and are keyboard and VoiceOver accessible (`role=slider`, arrow keys).
+- **Squishy Clay** replaced Silk Ribbons, at Johnny's request. Each vertex has two layers of deformation: an elastic one (springs back with a wobble) and a plastic one (takes over while a finger holds, so shapes stay moulded). The moulded shape relaxes very slowly, with a half-life of about 3 minutes, so the clay never stays messy for good.
+- **Squishy Mirror** uses a 2D mass-spring sheet under the live camera picture, and the picture always springs back. A camera feed can't be moulded permanently without looking broken, so it never is. The camera is requested with `getUserMedia` only inside that scene, and stopped on leaving it.
 - No dependencies were added beyond Three.js.
 
 ## Known limitations

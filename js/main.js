@@ -21,10 +21,11 @@ const SCENES = [
   { id: 'jelly', load: () => import('./scenes/jelly.js'), ambient: -3, echoTime: 0.3, fx: [['wobble', 0], ['warmth', 0.3], ['pitch', 0.5]] },
   { id: 'stars', load: () => import('./scenes/stars.js'), ambient: 2, echoTime: 0.55, fx: [['space', 0.45], ['echo', 0.15], ['sparkle', 0.2]] },
   { id: 'pond', load: () => import('./scenes/pond.js'), ambient: 0, echoTime: 0.45, fx: [['echo', 0.25], ['space', 0.4], ['shimmer', 0.1]] },
-  { id: 'ribbons', load: () => import('./scenes/ribbons.js'), ambient: 3, echoTime: 0.5, fx: [['warmth', 0.2], ['wobble', 0], ['space', 0.35]] },
+  { id: 'clay', load: () => import('./scenes/clay.js'), ambient: 3, echoTime: 0.4, fx: [['wobble', 0], ['echo', 0.1], ['pitch', 0.5]] },
   { id: 'gravity', load: () => import('./scenes/gravity.js'), ambient: -1, echoTime: 0.25, fx: [['echo', 0.15], ['pitch', 0.5], ['sparkle', 0.2]] },
   { id: 'waterfall', load: () => import('./scenes/waterfall.js'), ambient: 1, echoTime: 0.3, fx: [['echo', 0.1], ['ring', 0.25], ['pitch', 0.5]] },
   { id: 'kaleido', load: () => import('./scenes/kaleido.js'), ambient: 4, echoTime: 0.6, fx: [['echo', 0.3], ['shimmer', 0.2], ['space', 0.4]] },
+  { id: 'mirror', load: () => import('./scenes/mirror.js'), ambient: 0, echoTime: 0.35, fx: [['wobble', 0], ['warmth', 0.2], ['pitch', 0.5]] },
 ];
 
 // ---------------------------------------------------------------------------
@@ -33,7 +34,7 @@ const SCENES = [
 const STORE_KEY = 'calmspace.settings.v1';
 const DEFAULTS = {
   theme: 'neon', volume: 0.7, ambient: false, scale: 'pentMajor',
-  motion: 'medium', density: 'medium', lock: false, windDown: 0,
+  motion: 'medium', density: 'medium', lock: false, navAutoHide: false, windDown: 0,
   kaleidoSegments: 8, muted: false, lastScene: 0, fxPanel: true, fx: {},
 };
 function loadSettings() {
@@ -240,7 +241,8 @@ function showNav() {
   if (settings.lock) return;
   nav.classList.remove('hidden');
   clearTimeout(navTimer);
-  navTimer = setTimeout(() => nav.classList.add('hidden'), 4000);
+  // The scene chooser stays open unless parents switch auto-hide on.
+  if (settings.navAutoHide) navTimer = setTimeout(() => nav.classList.add('hidden'), 4000);
 }
 function revealNavIfBottom(p) {
   if (!settings.lock && nav.classList.contains('hidden') && p.y > window.innerHeight - 110) showNav();
