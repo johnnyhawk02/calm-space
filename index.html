@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en" data-theme="neon">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Calm Space</title>
+<meta name="description" content="A calm, tactile 3D sensory space for children.">
+<meta name="theme-color" content="#0c0f22">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Calm Space">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<script type="importmap">
+  { "imports": { "three": "./vendor/three.module.js" } }
+</script>
+<style>
+  :root {
+    --bg: #0c0f22; --ink: #c9d4ff; --chrome: rgba(20, 24, 52, 0.55); --chrome-line: rgba(201, 212, 255, 0.16);
+    --btn: rgba(201, 212, 255, 0.07); --btn-active: rgba(126, 164, 255, 0.28); --accent: #7ea4ff;
+    --panel: #161a36; --panel-ink: #e6eaff; --muted-ink: #9aa3cf;
+    color-scheme: dark;
+    --sat: env(safe-area-inset-top, 0px); --sab: env(safe-area-inset-bottom, 0px);
+    --sal: env(safe-area-inset-left, 0px); --sar: env(safe-area-inset-right, 0px);
+  }
+  [data-theme="pastel"] {
+    --bg: #ece6f2; --ink: #6d6a92; --chrome: rgba(255, 255, 255, 0.55); --chrome-line: rgba(109, 106, 146, 0.16);
+    --btn: rgba(109, 106, 146, 0.06); --btn-active: rgba(195, 174, 240, 0.55); --accent: #8f7fd6;
+    --panel: #f8f5fb; --panel-ink: #3f3c62; --muted-ink: #7a7799; color-scheme: light;
+  }
+  [data-theme="contrast"] {
+    --bg: #000; --ink: #fff; --chrome: rgba(0, 0, 0, 0.8); --chrome-line: rgba(255, 255, 255, 0.7);
+    --btn: rgba(255, 255, 255, 0.08); --btn-active: #ffe600; --accent: #ffe600;
+    --panel: #000; --panel-ink: #fff; --muted-ink: #fff;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink);
+    font: 16px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Rounded", "Segoe UI", Roboto, sans-serif;
+    touch-action: none; overscroll-behavior: none; position: fixed; inset: 0;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-text-size-adjust: 100%;
+  }
+  #stage { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; display: block; touch-action: none; outline: none; }
+
+  /* Veil used for the ~600 ms cross-fade between scenes (theme-coloured, never a white flash). */
+  #veil { position: fixed; inset: 0; background: var(--bg); opacity: 0; pointer-events: none; transition: opacity .3s ease; z-index: 5; }
+  #veil.on { opacity: 1; }
+  /* Wind-down dimmer (opacity driven from JS, very slowly). */
+  #dimmer { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 6; }
+
+  /* ---- Navigation ---- */
+  #nav {
+    position: fixed; left: 50%; bottom: calc(10px + var(--sab)); transform: translateX(-50%);
+    display: flex; gap: 8px; padding: 8px; border-radius: 30px; z-index: 10;
+    background: var(--chrome); border: 1px solid var(--chrome-line);
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    transition: opacity .8s ease, transform .8s ease; max-width: calc(100vw - 24px);
+  }
+  #nav.hidden { opacity: 0; transform: translateX(-50%) translateY(24px); pointer-events: none; }
+  #nav.locked { display: none; }
+  .icon-btn {
+    width: 64px; height: 64px; min-width: 60px; border-radius: 20px; border: 0; padding: 0; margin: 0;
+    background: var(--btn); color: var(--ink); display: grid; place-items: center; cursor: pointer;
+    transition: background .4s ease, transform .25s ease; touch-action: manipulation;
+  }
+  .icon-btn svg { width: 36px; height: 36px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .icon-btn.active { background: var(--btn-active); }
+  [data-theme="contrast"] .icon-btn.active { color: #000; }
+  .icon-btn:active { transform: scale(.94); }
+  .icon-btn:focus-visible, .dot:focus-visible, button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  @media (max-width: 640px) { #nav { gap: 4px; padding: 6px; } .icon-btn { width: 60px; height: 60px; } }
+
+  /* Mute: always reachable, top-right, soft. */
+  #mute { position: fixed; top: calc(12px + var(--sat)); right: calc(12px + var(--sar)); z-index: 11; width: 60px; height: 60px; border-radius: 30px; opacity: .55; background: var(--chrome); }
+  #mute .off { display: none; } #mute.muted .on { display: none; } #mute.muted .off { display: block; }
+
+  /* Parent dot: tiny and unobtrusive, but a 60px hold target. */
+  .dot { position: fixed; top: calc(8px + var(--sat)); left: calc(8px + var(--sal)); z-index: 11; width: 60px; height: 60px; border: 0; background: transparent; padding: 0; touch-action: none; }
+  .dot svg { width: 60px; height: 60px; }
+  .dot .core { fill: var(--ink); opacity: .28; }
+  .dot .ring-bg { fill: none; stroke: var(--ink); opacity: .08; stroke-width: 4; }
+  .dot .ring-fill { fill: none; stroke: var(--accent); stroke-width: 4; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 30px 30px; }
+
+  /* ---- Splash ---- */
+  #splash { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(12, 15, 34, .82); background: color-mix(in srgb, var(--bg) 82%, transparent); transition: opacity .9s ease; cursor: pointer; }
+  #splash.gone { opacity: 0; pointer-events: none; }
+  #splash .inner { display: grid; place-items: center; gap: 22px; }
+  #splash .orb { width: 160px; height: 160px; border-radius: 50%; background: radial-gradient(circle at 40% 38%, #c9d4ff, rgba(126,164,255,.35) 62%, transparent 72%); background: radial-gradient(circle at 40% 38%, color-mix(in srgb, var(--accent) 80%, white), color-mix(in srgb, var(--accent) 35%, transparent) 62%, transparent 72%); animation: breathe 5s ease-in-out infinite; }
+  #splash .hint { font-size: 20px; letter-spacing: .04em; opacity: .7; }
+  @keyframes breathe { 0%, 100% { transform: scale(.92); opacity: .75; } 50% { transform: scale(1.06); opacity: 1; } }
+
+  /* ---- Settings panel (parents) ---- */
+  #settings { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(0, 0, 0, .35); opacity: 0; transition: opacity .25s ease; padding: calc(16px + var(--sat)) 16px calc(16px + var(--sab)); }
+  #settings.open { opacity: 1; }
+  #settings[hidden] { display: none; }
+  .card { width: min(560px, 100%); max-height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; overscroll-behavior: contain;
+    background: var(--panel); color: var(--panel-ink); border-radius: 26px; padding: 22px 24px; box-shadow: 0 20px 60px rgba(0,0,0,.35); border: 1px solid var(--chrome-line); -webkit-user-select: none; }
+  .card h2 { margin: 0 0 4px; font-size: 22px; font-weight: 600; }
+  .card p.sub { margin: 0 0 16px; color: var(--muted-ink); font-size: 14px; }
+  fieldset { border: 0; margin: 0 0 16px; padding: 0; }
+  legend { font-weight: 600; font-size: 15px; margin-bottom: 8px; padding: 0; }
+  .seg { display: flex; flex-wrap: wrap; gap: 6px; }
+  .seg label { flex: 1 1 auto; position: relative; }
+  .seg input { position: absolute; opacity: 0; pointer-events: none; }
+  .seg span { display: block; text-align: center; padding: 12px 10px; min-height: 48px; border-radius: 14px; background: var(--btn); border: 1px solid var(--chrome-line); cursor: pointer; font-size: 15px; }
+  .seg input:checked + span { background: var(--btn-active); border-color: var(--accent); }
+  [data-theme="contrast"] .seg input:checked + span { color: #000; }
+  .seg input:focus-visible + span { outline: 3px solid var(--accent); }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; }
+  .row label { flex: 1; }
+  input[type=range] { width: 100%; height: 40px; accent-color: var(--accent); touch-action: pan-x; }
+  .switch { width: 30px; height: 30px; accent-color: var(--accent); }
+  .card .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
+  .card .actions button { min-height: 52px; padding: 0 22px; border-radius: 16px; border: 1px solid var(--chrome-line); background: var(--btn); color: inherit; font: inherit; font-weight: 600; }
+  .card .actions .done { background: var(--btn-active); border-color: var(--accent); }
+  [data-theme="contrast"] .card .actions .done { color: #000; }
+  .note { font-size: 13px; color: var(--muted-ink); margin: 4px 0 0; }
+
+  @media (prefers-reduced-motion: reduce) {
+    #splash .orb { animation-duration: 10s; }
+    #nav, #veil, #splash { transition-duration: .4s; }
+  }
+</style>
+</head>
+<body>
+<canvas id="stage" aria-label="Interactive calm sensory scene. Touch anywhere." role="img" tabindex="-1"></canvas>
+<div id="veil" class="on"></div>
+<div id="dimmer"></div>
+
+<nav id="nav" class="hidden" aria-label="Scenes">
+  <button class="icon-btn" data-scene="0" aria-label="Disc field">
+    <svg viewBox="0 0 36 36"><circle cx="9" cy="9" r="3.5"/><circle cx="18" cy="9" r="3.5"/><circle cx="27" cy="9" r="3.5"/><circle cx="9" cy="18" r="3.5"/><circle cx="18" cy="18" r="3.5"/><circle cx="27" cy="18" r="3.5"/><circle cx="9" cy="27" r="3.5"/><circle cx="18" cy="27" r="3.5"/><circle cx="27" cy="27" r="3.5"/></svg>
+  </button>
+  <button class="icon-btn" data-scene="1" aria-label="Jelly blob">
+    <svg viewBox="0 0 36 36"><path d="M18 5c7 0 12 5 12 11.5S27 30 19 30.5 6 27 6 19 11 5 18 5z"/><circle cx="14" cy="15" r="2"/></svg>
+  </button>
+  <button class="icon-btn" data-scene="2" aria-label="Star swarm">
+    <svg viewBox="0 0 36 36"><path d="M18 6l1.8 5.2L25 13l-5.2 1.8L18 20l-1.8-5.2L11 13l5.2-1.8z"/><path d="M27 21l.9 2.6 2.6.9-2.6.9L27 28l-.9-2.6-2.6-.9 2.6-.9z"/><circle cx="9" cy="26" r="1.4"/><circle cx="8" cy="9" r="1"/></svg>
+  </button>
+  <button class="icon-btn" data-scene="3" aria-label="Ripple pond">
+    <svg viewBox="0 0 36 36"><ellipse cx="18" cy="20" rx="4" ry="2"/><ellipse cx="18" cy="20" rx="9" ry="4.5"/><ellipse cx="18" cy="20" rx="14" ry="7"/><path d="M18 6v6"/></svg>
+  </button>
+  <button class="icon-btn" data-scene="4" aria-label="Silk ribbons">
+    <svg viewBox="0 0 36 36"><path d="M4 22c5-10 9-10 13 0s9 10 15-2"/><path d="M4 14c5-6 9-6 13 1s9 7 15-1"/></svg>
+  </button>
+  <button class="icon-btn" data-scene="5" aria-label="Gravity garden">
+    <svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="3"/><ellipse cx="18" cy="18" rx="13" ry="6" transform="rotate(-25 18 18)"/><circle cx="29" cy="12" r="2"/><circle cx="8" cy="23" r="1.6"/></svg>
+  </button>
+  <button class="icon-btn" data-scene="6" aria-label="Chime waterfall">
+    <svg viewBox="0 0 36 36"><circle cx="18" cy="9" r="1.6"/><circle cx="12" cy="16" r="1.6"/><circle cx="24" cy="16" r="1.6"/><circle cx="6" cy="23" r="1.6"/><circle cx="18" cy="23" r="1.6"/><circle cx="30" cy="23" r="1.6"/><path d="M15 4v2M21 28v4"/></svg>
+  </button>
+  <button class="icon-btn" data-scene="7" aria-label="Kaleidoscope">
+    <svg viewBox="0 0 36 36"><path d="M18 18l0-12M18 18l10.4-6M18 18l10.4 6M18 18v12M18 18l-10.4 6M18 18l-10.4-6"/><circle cx="18" cy="18" r="13"/><circle cx="18" cy="11" r="2"/><circle cx="24" cy="21.5" r="2"/><circle cx="12" cy="21.5" r="2"/></svg>
+  </button>
+</nav>
+
+<button id="mute" class="icon-btn" aria-label="Sound on or off" aria-pressed="false">
+  <svg class="on" viewBox="0 0 36 36"><path d="M7 14h5l7-6v20l-7-6H7z"/><path d="M24 13c2 2.5 2 7.5 0 10M27.5 10c4 4.5 4 11.5 0 16"/></svg>
+  <svg class="off" viewBox="0 0 36 36"><path d="M7 14h5l7-6v20l-7-6H7z"/><path d="M24 14l7 8M31 14l-7 8"/></svg>
+</button>
+
+<button id="parent-dot" class="dot" aria-label="Parent settings. Press and hold for 3 seconds.">
+  <svg viewBox="0 0 60 60"><circle class="ring-bg" cx="30" cy="30" r="22"/><circle class="ring-fill" cx="30" cy="30" r="22"/><circle class="core" cx="30" cy="30" r="6"/></svg>
+</button>
+
+<div id="splash" role="button" tabindex="0" aria-label="Tap to begin">
+  <div class="inner"><div class="orb"></div><div class="hint">tap to begin</div></div>
+</div>
+
+<div id="settings" hidden role="dialog" aria-modal="true" aria-labelledby="settings-title">
+  <div class="card scrollable">
+    <h2 id="settings-title">Parent settings</h2>
+    <p class="sub">Changes are saved on this device.</p>
+    <form>
+      <fieldset>
+        <legend>Theme</legend>
+        <div class="seg">
+          <label><input type="radio" name="theme" value="pastel"><span>Pastel</span></label>
+          <label><input type="radio" name="theme" value="neon"><span>Soft Neon Dark</span></label>
+          <label><input type="radio" name="theme" value="contrast"><span>High Contrast</span></label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Sound</legend>
+        <div class="row"><label for="s-vol">Master volume <span data-out="volume"></span></label></div>
+        <input id="s-vol" type="range" name="volume" min="0" max="1" step="0.05">
+        <div class="row"><label for="s-amb">Quiet ambient pad</label><input id="s-amb" class="switch" type="checkbox" name="ambient"></div>
+        <div class="seg">
+          <label><input type="radio" name="scale" value="pentMajor"><span>Pentatonic major</span></label>
+          <label><input type="radio" name="scale" value="pentMinor"><span>Pentatonic minor</span></label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Motion speed</legend>
+        <div class="seg">
+          <label><input type="radio" name="motion" value="low"><span>Low</span></label>
+          <label><input type="radio" name="motion" value="medium"><span>Medium</span></label>
+          <label><input type="radio" name="motion" value="high"><span>High</span></label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Particle density</legend>
+        <div class="seg">
+          <label><input type="radio" name="density" value="low"><span>Low</span></label>
+          <label><input type="radio" name="density" value="medium"><span>Medium</span></label>
+          <label><input type="radio" name="density" value="high"><span>High</span></label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Kaleidoscope segments</legend>
+        <div class="row"><label for="s-seg">Mirror segments <span data-out="kaleidoSegments"></span></label></div>
+        <input id="s-seg" type="range" name="kaleidoSegments" min="6" max="12" step="1">
+      </fieldset>
+      <fieldset>
+        <legend>Focus</legend>
+        <div class="row"><label for="s-lock">Lock to this scene (hides the scene buttons)</label><input id="s-lock" class="switch" type="checkbox" name="lock"></div>
+        <p class="note">For a full lock, use iPad Guided Access (Settings › Accessibility › Guided Access).</p>
+      </fieldset>
+      <fieldset>
+        <legend>Wind down</legend>
+        <p class="note" style="margin:0 0 8px">After the chosen time, the screen slowly dims and sound quietens over 2 minutes. It never stops suddenly.</p>
+        <div class="seg">
+          <label><input type="radio" name="windDown" value="0"><span>Off</span></label>
+          <label><input type="radio" name="windDown" value="5"><span>5 min</span></label>
+          <label><input type="radio" name="windDown" value="10"><span>10 min</span></label>
+          <label><input type="radio" name="windDown" value="15"><span>15 min</span></label>
+          <label><input type="radio" name="windDown" value="20"><span>20 min</span></label>
+        </div>
+      </fieldset>
+    </form>
+    <div class="actions">
+      <button type="button" class="reset-wind">Restart wind-down</button>
+      <button type="button" class="done">Done</button>
+    </div>
+  </div>
+</div>
+
+<noscript><p style="padding:24px">Calm Space needs JavaScript and WebGL.</p></noscript>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
