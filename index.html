@@ -84,6 +84,23 @@
   .dot .ring-bg { fill: none; stroke: var(--ink); opacity: .08; stroke-width: 4; }
   .dot .ring-fill { fill: none; stroke: var(--accent); stroke-width: 4; stroke-linecap: round; transform: rotate(-90deg); transform-origin: 30px 30px; }
 
+
+  /* ---- Sound sliders (right edge) ---- */
+  #fx { position: fixed; right: calc(10px + var(--sar)); top: 50%; transform: translateY(-50%); z-index: 10;
+    display: flex; flex-direction: column; gap: 10px; padding: 10px 8px; border-radius: 30px;
+    background: var(--chrome); border: 1px solid var(--chrome-line);
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); transition: opacity .8s ease; touch-action: none; }
+  #fx[hidden] { display: none; }
+  #fx.dim { opacity: .45; }
+  .fx-slider { width: 64px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 4px 0; touch-action: none; cursor: pointer; outline: none; border-radius: 18px; }
+  .fx-slider:focus-visible { outline: 3px solid var(--accent); }
+  .fx-slider svg { width: 26px; height: 26px; fill: none; stroke: var(--ink); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .fx-slider .track { position: relative; width: 18px; height: clamp(84px, 17vh, 170px); border-radius: 9px; background: var(--btn); border: 1px solid var(--chrome-line); }
+  .fx-slider .fill { position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--v, 0) * 100%); border-radius: 9px; background: var(--c); opacity: .75; }
+  .fx-slider .thumb { position: absolute; left: 50%; bottom: calc(var(--v, 0) * 100%); width: 34px; height: 34px; margin: 0 0 -17px -17px; border-radius: 50%;
+    background: var(--c); border: 3px solid var(--panel); box-shadow: 0 2px 10px rgba(0,0,0,.25); transition: transform .2s ease; }
+  .fx-slider.active .thumb { transform: scale(1.15); }
+  @media (max-height: 700px) { #fx { gap: 4px; padding: 6px; } .fx-slider svg { width: 22px; height: 22px; } }
   /* ---- Splash ---- */
   #splash { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(12, 15, 34, .82); background: color-mix(in srgb, var(--bg) 82%, transparent); transition: opacity .9s ease; cursor: pointer; }
   #splash.gone { opacity: 0; pointer-events: none; }
@@ -157,6 +174,8 @@
   </button>
 </nav>
 
+<div id="fx" aria-label="Sound sliders"></div>
+
 <button id="mute" class="icon-btn" aria-label="Sound on or off" aria-pressed="false">
   <svg class="on" viewBox="0 0 36 36"><path d="M7 14h5l7-6v20l-7-6H7z"/><path d="M24 13c2 2.5 2 7.5 0 10M27.5 10c4 4.5 4 11.5 0 16"/></svg>
   <svg class="off" viewBox="0 0 36 36"><path d="M7 14h5l7-6v20l-7-6H7z"/><path d="M24 14l7 8M31 14l-7 8"/></svg>
@@ -188,6 +207,7 @@
         <div class="row"><label for="s-vol">Master volume <span data-out="volume"></span></label></div>
         <input id="s-vol" type="range" name="volume" min="0" max="1" step="0.05">
         <div class="row"><label for="s-amb">Quiet ambient pad</label><input id="s-amb" class="switch" type="checkbox" name="ambient"></div>
+        <div class="row"><label for="s-fx">Show the 3 sound sliders on the right</label><input id="s-fx" class="switch" type="checkbox" name="fxPanel"></div>
         <div class="seg">
           <label><input type="radio" name="scale" value="pentMajor"><span>Pentatonic major</span></label>
           <label><input type="radio" name="scale" value="pentMinor"><span>Pentatonic minor</span></label>
