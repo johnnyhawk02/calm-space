@@ -26,6 +26,7 @@ const SCENES = [
   { id: 'waterfall', load: () => import('./scenes/waterfall.js'), ambient: 1, echoTime: 0.3, fx: [['echo', 0.1], ['ring', 0.25], ['pitch', 0.5]] },
   { id: 'kaleido', load: () => import('./scenes/kaleido.js'), ambient: 4, echoTime: 0.6, fx: [['echo', 0.3], ['shimmer', 0.2], ['space', 0.4]] },
   { id: 'mirror', load: () => import('./scenes/mirror.js'), ambient: 0, echoTime: 0.35, fx: [['wobble', 0], ['warmth', 0.2], ['pitch', 0.5]] },
+  { id: 'cannon', load: () => import('./scenes/cannon.js'), ambient: 0, echoTime: 0.3, fx: [['wobble', 0], ['space', 0.3], ['pitch', 0.5]] },
 ];
 
 // ---------------------------------------------------------------------------
