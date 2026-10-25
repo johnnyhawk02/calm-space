@@ -101,12 +101,12 @@
     background: var(--c); border: 3px solid var(--panel); box-shadow: 0 2px 10px rgba(0,0,0,.25); transition: transform .2s ease; }
   .fx-slider.active .thumb { transform: scale(1.15); }
   @media (max-height: 700px) { #fx { gap: 4px; padding: 6px; } .fx-slider svg { width: 22px; height: 22px; } }
-  /* ---- Clay rotate controls (left edge, created by the clay scene) ---- */
-  #rotpad { position: fixed; left: calc(10px + var(--sal)); top: 50%; transform: translateY(-50%); z-index: 10;
+  /* ---- Clay rotate controls and camera switch (left edge, created by their scenes) ---- */
+  #rotpad, #campad { position: fixed; left: calc(10px + var(--sal)); top: 50%; transform: translateY(-50%); z-index: 10;
     display: flex; flex-direction: column; gap: 8px; padding: 8px; border-radius: 30px;
     background: var(--chrome); border: 1px solid var(--chrome-line);
     -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); touch-action: none; }
-  #rotpad .icon-btn { width: 60px; height: 60px; }
+  #rotpad .icon-btn, #campad .icon-btn { width: 60px; height: 60px; }
   @media (max-height: 700px) { #rotpad { gap: 4px; padding: 6px; } #rotpad .icon-btn { width: 56px; height: 56px; min-width: 56px; } }
   /* ---- Splash ---- */
   #splash { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(12, 15, 34, .82); background: color-mix(in srgb, var(--bg) 82%, transparent); transition: opacity .9s ease; cursor: pointer; }
@@ -181,6 +181,9 @@
   </button>
   <button class="icon-btn" data-scene="8" aria-label="Squishy mirror (camera)">
     <svg viewBox="0 0 36 36"><rect x="5" y="9" width="26" height="20" rx="5"/><circle cx="18" cy="19" r="5"/><path d="M13 9l2-3h6l2 3"/></svg>
+  </button>
+  <button class="icon-btn" data-scene="9" aria-label="Bubble cannon (camera)">
+    <svg viewBox="0 0 36 36"><path d="M8 29a10 10 0 0 1 20 0z"/><path d="M15 21l6-12 4 2-4 12"/><circle cx="26" cy="6" r="2.5"/></svg>
   </button>
 </nav>
 

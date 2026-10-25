@@ -4,7 +4,7 @@ A calm, tactile 3D sensory app for iPad, made for autistic and neurodivergent ch
 
 It is a Progressive Web App: plain HTML and ES modules, no build step, with one dependency (Three.js r170, vendored). It works fully offline after the first load.
 
-## The 9 scenes
+## The 10 scenes
 
 | # | Scene | Touch | Sound |
 |---|-------|-------|-------|
@@ -16,7 +16,8 @@ It is a Progressive Web App: plain HTML and ES modules, no build step, with one 
 | 6 | Gravity Garden | Hold one finger to make a gravity well that gems spiral into. Hold two or more fingers to push them away. | Soft clinks when gems meet, plus a low hum from each well. |
 | 7 | Chime Waterfall | Touch to drop a bead, hold to pour beads, drag sideways to tilt the board. | Each peg rings a note from its column (a music box). |
 | 8 | Kaleidoscope | Paint shapes that are mirrored into 6 to 12 turning segments and fade over about 10 s. | Bells pitched by distance from the centre. |
-| 9 | Squishy Mirror | The front camera's picture becomes soft jelly. Drag to pull and smear it, hold still to make a magnifying bulge, and let go to watch it wobble back. Without a camera it uses a soft colourful pattern. | Squish tones and a stretching pad, like the clay. |
+| 9 | Squishy Mirror | The front camera's picture becomes soft jelly. Drag to pull and smear it, hold still to make a magnifying bulge, and let go to watch it wobble back. Without a camera it uses a soft colourful pattern. The button on the left switches between the front and back cameras. | Squish tones and a stretching pad, like the clay. |
+| 10 | Bubble Cannon | The same camera picture, with a friendly cannon near the bottom. Touch anywhere: the cannon turns to your finger and lobs a soft ball there, and keeps firing gently (about twice a second) while you hold. Where a ball lands, the picture is pressed in and wobbles back out. Balls squash and fade, so nothing piles up. Uses the same front/back camera switch. | A soft plip as a ball leaves the cannon, and a round squish tone when it lands. |
 
 ### Sound sliders
 
@@ -33,6 +34,7 @@ Each scene has **three large vertical sliders on the right-hand side** that chan
 | Chime Waterfall | Echo · Ring length · Pitch |
 | Kaleidoscope | Echo · Shimmer · Space |
 | Squishy Mirror | Wobble · Warmth · Pitch |
+| Bubble Cannon | Wobble · Space · Pitch |
 
 What each effect does:
 - **Echo:** soft, darkening repeats. The spacing is set per scene, and feedback is capped at 0.6.
@@ -92,7 +94,7 @@ To test on a real iPad on the same Wi-Fi, open `http://<your-computer-ip>:8080`.
   - **Wind down**: after 5, 10, 15 or 20 minutes, the screen slowly dims and the sound quietens over 2 minutes, then stays calm and dim. It never stops suddenly.
 - **Mute:** the speaker button in the top-right corner is always available.
 - **Scene buttons:** the bar stays visible by default. To have it fade after 4 s, turn on "Auto-hide the scene buttons" in settings. Then a tap near the bottom edge brings it back.
-- **Camera (Squishy Mirror):** the camera is only switched on while that scene is open. iPadOS asks for permission the first time. The picture stays on the iPad: it is never recorded, saved or uploaded. If you refuse permission, the scene uses a colourful pattern instead.
+- **Camera (Squishy Mirror and Bubble Cannon):** the camera is only switched on while one of those scenes is open. If the iPad has two cameras, a button on the left switches between the front and back camera, and the choice is remembered. iPadOS asks for permission the first time. The picture stays on the iPad: it is never recorded, saved or uploaded. If you refuse permission, the scene uses a colourful pattern instead.
 - **Guided Access is the best way to keep a child inside the app.** Turn it on in Settings › Accessibility › Guided Access, open Calm Space, and triple-click the side (or Home) button. You can also disable areas of the screen, such as the settings dot.
 - Settings and the last scene are saved on the device in localStorage.
 - If the iPad has **Reduce Motion** turned on, every scene moves more slowly, camera drift is switched off, and there are fewer particles.
@@ -146,6 +148,8 @@ The app was tested in headless Chromium (software WebGL) at iPad sizes 1180×820
 - **Vendored Three.js** is the official minified ES-module build (about 690 KB), saved as `vendor/three.module.js` to keep the download small. Everything else is about 210 KB in total, icons included.
 - **Sound sliders** are custom vertical sliders rather than `<input type=range>`. Vertical range inputs are unreliable in iPad Safari, and the custom version gives a 64 px wide touch target with a 34 px thumb. They are labelled with icons rather than text, and are keyboard and VoiceOver accessible (`role=slider`, arrow keys).
 - **Squishy Clay** replaced Silk Ribbons, at Johnny's request. Each vertex has two layers of deformation: an elastic one (springs back with a wobble) and a plastic one (takes over while a finger holds, so shapes stay moulded). The moulded shape relaxes very slowly, with a half-life of about 3 minutes, so the clay never stays messy for good.
+- **Bubble Cannon** reuses the Squishy Mirror sheet. A landing ball pulls the nearby picture towards the hit point, which looks like the picture being pressed in, and the springs then bounce it back out. Balls are slow, at most 12 are in the air, and there is no flash, bang or shake.
+- **Front/back camera:** only the front camera is mirrored, because a mirrored back camera would make movement feel backwards. The switch is hidden on devices with a single camera.
 - **Squishy Mirror** uses a 2D mass-spring sheet under the live camera picture, and the picture always springs back. A camera feed can't be moulded permanently without looking broken, so it never is. The camera is requested with `getUserMedia` only inside that scene, and stopped on leaving it.
 - No dependencies were added beyond Three.js.
 

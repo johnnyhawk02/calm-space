@@ -11,6 +11,9 @@
  *   • letting go springs it back with a gentle wobble. The border is pinned.
  * The picture always returns to normal: nothing is moulded permanently here.
  *
+ * CAMERA: front or back, switched with the button on the left (shown only when
+ * the device has two cameras). Only the front camera is mirrored.
+ *
  * PRIVACY: the camera is only requested when this scene opens, the picture
  * never leaves the device (it is not recorded, saved or uploaded), and the
  * camera is switched off as soon as you leave the scene. If there is no
@@ -28,6 +31,11 @@ const MAX_GRABS = 5;
 const K = 38, C = 3.0, KC = 140;   // spring, damping, neighbour coupling
 const KG = 260;                     // how firmly a finger holds its patch
 const SIGMA = 0.16;                 // patch size (fraction of screen height)
+
+// Which camera to use ('user' = front, 'environment' = back), remembered on this device.
+const FACING_KEY = 'calm-space-camera';
+const loadFacing = () => { try { return localStorage.getItem(FACING_KEY) === 'environment' ? 'environment' : 'user'; } catch (e) { return 'user'; } };
+const saveFacing = (f) => { try { localStorage.setItem(FACING_KEY, f); } catch (e) { /* private mode */ } };
 
 export default class SquishyMirror {
   init(renderer, audio, settings) {
@@ -90,26 +98,65 @@ export default class SquishyMirror {
     return t;
   }
 
-  async startCamera() {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+  /**
+   * Start (or switch to) the front or back camera. The choice is remembered on
+   * this device. Only the front camera is mirrored, like a real mirror.
+   */
+  async startCamera(facing = loadFacing()) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || this.switching) return;
+    this.switching = true;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
       if (this.disposed) { stream.getTracks().forEach((t) => t.stop()); return; }
+      if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
       this.stream = stream;
-      const v = this.video = document.createElement('video');
-      v.setAttribute('playsinline', ''); v.muted = true; v.autoplay = true;
+      const real = stream.getVideoTracks()[0]?.getSettings?.().facingMode;
+      this.facing = real === 'environment' || real === 'user' ? real : facing;
+      let v = this.video;
+      if (!v) {
+        v = this.video = document.createElement('video');
+        v.setAttribute('playsinline', ''); v.muted = true; v.autoplay = true;
+        v.addEventListener('resize', () => this.fit());
+      }
       v.srcObject = stream;
       await v.play();
       if (this.disposed) return;
-      const tex = new THREE.VideoTexture(v);
-      tex.colorSpace = THREE.SRGBColorSpace;
-      this.videoTex = tex;
-      this.uniforms.uTex.value = tex;
-      this.uniforms.uMirror.value = 1;
+      if (!this.videoTex) {
+        const tex = new THREE.VideoTexture(v);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        this.videoTex = tex;
+        this.uniforms.uTex.value = tex;
+      }
+      this.uniforms.uMirror.value = this.facing === 'user' ? 1 : 0;
       this.fit();
+      this.buildCamButton();
     } catch (e) {
       console.info('[calm] camera not available, using pattern:', e && e.name);
+    } finally {
+      this.switching = false;
     }
+  }
+
+  /** Front/back switch on the left edge, shown only when there is more than one camera. */
+  async buildCamButton() {
+    if (this.camPad || this.disposed) return;
+    let cams = 0;
+    try { cams = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput').length; } catch (e) { /* ignore */ }
+    if (cams < 2 || this.camPad || this.disposed) return;
+    const pad = this.camPad = document.createElement('div');
+    pad.id = 'campad';
+    const b = document.createElement('button');
+    b.className = 'icon-btn';
+    b.setAttribute('aria-label', 'Switch between front and back camera');
+    b.innerHTML = '<svg viewBox="0 0 36 36"><rect x="5" y="10" width="26" height="19" rx="5"/><path d="M14 10l2-3h4l2 3"/><path d="M13 20a5 5 0 0 1 9-3M23 19a5 5 0 0 1-9 3"/><path d="M22 14v3h-3M14 25v-3h3"/></svg>';
+    b.addEventListener('click', () => {
+      const next = this.facing === 'user' ? 'environment' : 'user';
+      saveFacing(next);
+      this.audio.marimba(this.audio.freq(next === 'user' ? 9 : 7), 0.22, 0, 0.2);
+      this.startCamera(next);
+    });
+    pad.appendChild(b);
+    document.body.appendChild(pad);
   }
 
   /** Cover-fit the source picture to the screen. */
@@ -236,6 +283,7 @@ export default class SquishyMirror {
 
   dispose() {
     this.disposed = true;
+    if (this.camPad) this.camPad.remove();
     for (const g of this.grabs) if (g.pad) g.pad.stop();
     if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
     if (this.video) { this.video.pause(); this.video.srcObject = null; }
