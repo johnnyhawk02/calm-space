@@ -108,6 +108,13 @@
     -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); touch-action: none; }
   #rotpad .icon-btn, #campad .icon-btn { width: 60px; height: 60px; }
   @media (max-height: 700px) { #rotpad { gap: 4px; padding: 6px; } #rotpad .icon-btn { width: 56px; height: 56px; min-width: 56px; } }
+  /* ---- Bubble Cannon fire button (created by the cannon scene) ---- */
+  #firebtn { position: fixed; left: calc(50% + 62px); bottom: calc(118px + var(--sab)); z-index: 10; width: 92px; height: 92px; border-radius: 50%; padding: 0;
+    border: 5px solid #8f1d2c; touch-action: none; cursor: pointer;
+    background: radial-gradient(circle at 34% 28%, #fff 0 7%, #ffb3b8 12%, #ff4a57 32%, #e0182b 62%, #a50f20 100%);
+    box-shadow: 0 7px 0 #6e0b17, 0 12px 22px rgba(0,0,0,.35), inset 0 -6px 12px rgba(80,0,10,.35);
+    transition: transform .08s ease, box-shadow .08s ease; }
+  #firebtn.down { transform: translateY(6px); box-shadow: 0 1px 0 #6e0b17, 0 4px 10px rgba(0,0,0,.3), inset 0 -4px 10px rgba(80,0,10,.4); }
   /* ---- Splash ---- */
   #splash { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(12, 15, 34, .82); background: color-mix(in srgb, var(--bg) 82%, transparent); transition: opacity .9s ease; cursor: pointer; }
   #splash.gone { opacity: 0; pointer-events: none; }
