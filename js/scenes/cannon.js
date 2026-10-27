@@ -3,8 +3,10 @@
  *
  * The same live camera picture as Squishy Mirror (front or back camera, the
  * same soft jelly sheet), with a friendly round cannon near the bottom of the
- * screen. Touch anywhere: the cannon turns to face your finger and lobs a soft
- * ball there. Keep holding and it keeps firing, gently, about twice a second.
+ * screen and a big shiny red button beside it. Press the button: the cannon
+ * lobs a soft ball at the middle of the picture, landing a little off-centre
+ * each time. Keep holding and it keeps firing, gently, about twice a second.
+ * Touching the picture itself pulls and squishes it, as in Squishy Mirror.
  * Where a ball lands the picture is pressed in, then wobbles back out in soft
  * ripples. The ball squashes flat and fades: nothing is ever left behind.
  *
@@ -23,6 +25,7 @@ const FIRE_EVERY = 0.5;        // seconds between balls while a finger is held
 const HIT_SIGMA = 0.13;        // size of the dent (fraction of screen height)
 const HIT_PUSH = 7;            // strength of the dent
 const MAX_AIM = 1.3;           // radians either side of straight up
+const SPREAD = 0.3;            // how far from the centre a ball may land
 
 export default class BubbleCannon extends SquishyMirror {
   init(renderer, audio, settings) {
@@ -30,10 +33,11 @@ export default class BubbleCannon extends SquishyMirror {
     this.fireLimiter = new RateLimiter(5, 3);
     this.aim = 0; this.aimTarget = 0;
     this.balls = [];
-    this.shooters = [];
+    this.firing = false; this.fireWait = 0;
     this.recoil = 0;
     this.t = 0;
     this.buildCannon();
+    this.buildButton();
   }
 
   buildCannon() {
@@ -74,23 +78,18 @@ export default class BubbleCannon extends SquishyMirror {
     this.balls.length = 0;
   }
 
-  // ---- input: every finger aims and fires --------------------------------
-  onPointerDown(p) {
-    const s = { owner: p, x: p.nx * this.aspect, y: p.ny, wait: 0 };
-    this.shooters.push(s);
-    p.data = s;
-    this.fire(s);
-    s.wait = FIRE_EVERY;
-  }
-  onPointerMove(p) {
-    const s = p.data;
-    if (!s || !s.owner) return;
-    s.x = p.nx * this.aspect; s.y = p.ny;
-  }
-  onPointerUp(p) {
-    const s = p.data;
-    const i = this.shooters.indexOf(s);
-    if (i >= 0) this.shooters.splice(i, 1);
+  // ---- the red fire button (DOM, beside the cannon) -----------------------
+  buildButton() {
+    const b = this.button = document.createElement('button');
+    b.id = 'firebtn';
+    b.setAttribute('aria-label', 'Fire a ball');
+    const start = (e) => { e.preventDefault(); if (this.firing) return; this.firing = true; b.classList.add('down'); this.fire(); this.fireWait = FIRE_EVERY; };
+    const stop = () => { this.firing = false; b.classList.remove('down'); };
+    b.addEventListener('pointerdown', start);
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach((t) => b.addEventListener(t, stop));
+    b.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) start(e); });
+    b.addEventListener('keyup', stop);
+    document.body.appendChild(b);
   }
 
   angleTo(x, y) {
@@ -98,16 +97,18 @@ export default class BubbleCannon extends SquishyMirror {
     return clamp(Math.atan2(-(x - c.x), Math.max(0.02, y - c.y)), -MAX_AIM, MAX_AIM);
   }
 
-  fire(s) {
+  fire() {
     const now = performance.now() / 1000;
     if (this.balls.length >= MAX_BALLS || !this.fireLimiter.take(now)) return;
     const c = this.cannon.position;
-    const a = this.aimTarget = this.angleTo(s.x, s.y);
+    // Aim at the middle of the picture, a little off each time.
+    const r = SPREAD * Math.sqrt(Math.random()), th = Math.random() * Math.PI * 2;
+    const ax = r * Math.cos(th) * Math.min(1, this.aspect), ay = 0.1 + r * Math.sin(th);
+    const a = this.aimTarget = this.angleTo(ax, ay);
     // Muzzle position along the barrel.
     const L = 2.0 * this.size;
     const sx = c.x - Math.sin(a) * L, sy = c.y + Math.cos(a) * L;
-    // Land on the finger, but never below the muzzle.
-    const tx = s.x, ty = Math.max(s.y, sy + 0.05);
+    const tx = ax, ty = Math.max(ay, sy + 0.05);
     const dist = Math.hypot(tx - sx, ty - sy);
     const color = this.pal.colors[(this.colorI = ((this.colorI || 0) + 1) % this.pal.colors.length)];
     const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1, depthTest: false, depthWrite: false });
@@ -152,12 +153,11 @@ export default class BubbleCannon extends SquishyMirror {
   update(dt, time) {
     super.update(dt, time);
     this.t += dt;
-    // Held fingers keep firing, gently.
-    for (const s of this.shooters) {
-      s.wait -= dt;
-      if (s.wait <= 0) { this.fire(s); s.wait = FIRE_EVERY; }
-    }
-    if (this.shooters.length) this.aimTarget = this.angleTo(this.shooters[this.shooters.length - 1].x, this.shooters[this.shooters.length - 1].y);
+    // Holding the button keeps firing, gently. Between shots the cannon eases back to the middle.
+    if (this.firing) {
+      this.fireWait -= dt;
+      if (this.fireWait <= 0) { this.fire(); this.fireWait = FIRE_EVERY; }
+    } else if (this.recoil < 0.05) this.aimTarget = this.angleTo(0, 0.1);
     this.aim += (this.aimTarget - this.aim) * damp(10, dt);
     this.recoil *= 1 - damp(7, dt);
     this.barrel.rotation.z = this.aim;
@@ -190,6 +190,7 @@ export default class BubbleCannon extends SquishyMirror {
   }
 
   dispose() {
+    if (this.button) this.button.remove();
     for (const b of this.balls) this.removeBall(b);
     this.balls.length = 0;
     this.ballGeo.dispose(); this.shineGeo.dispose();
