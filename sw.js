@@ -2,10 +2,10 @@
  * sw.js — offline support. Precaches every file the app needs, then serves
  * cache-first. Bump VERSION whenever any file changes so devices update.
  */
-const VERSION = 'calm-space-v5';
+const VERSION = 'calm-space-v6';
 const FILES = [
   './', './index.html', './manifest.webmanifest',
-  './js/main.js', './js/input.js', './js/audio.js', './js/util.js',
+  './js/main.js', './js/input.js', './js/audio.js', './js/util.js', './js/fxpanel.js',
   './js/scenes/discs.js', './js/scenes/jelly.js', './js/scenes/stars.js', './js/scenes/pond.js',
   './js/scenes/clay.js', './js/scenes/gravity.js', './js/scenes/waterfall.js', './js/scenes/kaleido.js', './js/scenes/mirror.js',
   './js/scenes/cannon.js',

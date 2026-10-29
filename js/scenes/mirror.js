@@ -25,7 +25,7 @@
  * release gives a soft bloop.
  */
 import * as THREE from 'three';
-import { clamp, RateLimiter } from '../util.js';
+import { clamp, RateLimiter, sidePad, iconButton } from '../util.js';
 
 const MAX_GRABS = 5;
 const K = 38, C = 3.0, KC = 140;   // spring, damping, neighbour coupling
@@ -143,12 +143,9 @@ export default class SquishyMirror {
     let cams = 0;
     try { cams = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput').length; } catch (e) { /* ignore */ }
     if (cams < 2 || this.camPad || this.disposed) return;
-    const pad = this.camPad = document.createElement('div');
-    pad.id = 'campad';
-    const b = document.createElement('button');
-    b.className = 'icon-btn';
-    b.setAttribute('aria-label', 'Switch between front and back camera');
-    b.innerHTML = '<svg viewBox="0 0 36 36"><rect x="5" y="10" width="26" height="19" rx="5"/><path d="M14 10l2-3h4l2 3"/><path d="M13 20a5 5 0 0 1 9-3M23 19a5 5 0 0 1-9 3"/><path d="M22 14v3h-3M14 25v-3h3"/></svg>';
+    const pad = this.camPad = sidePad('campad');
+    const b = iconButton('Switch between front and back camera',
+      '<rect x="5" y="10" width="26" height="19" rx="5"/><path d="M14 10l2-3h4l2 3"/><path d="M13 20a5 5 0 0 1 9-3M23 19a5 5 0 0 1-9 3"/><path d="M22 14v3h-3M14 25v-3h3"/>');
     b.addEventListener('click', () => {
       const next = this.facing === 'user' ? 'environment' : 'user';
       saveFacing(next);
@@ -156,7 +153,6 @@ export default class SquishyMirror {
       this.startCamera(next);
     });
     pad.appendChild(b);
-    document.body.appendChild(pad);
   }
 
   /** Cover-fit the source picture to the screen. */
@@ -229,6 +225,17 @@ export default class SquishyMirror {
   }
 
   // ---- simulation ----------------------------------------------------------
+  /** Inner grid index range [i0, i1, j0, j1] covering a square of half-size R around (x, y). */
+  near(x, y, R) {
+    const { cols, rows, aspect } = this;
+    return [
+      Math.max(1, Math.floor((x - R + aspect) / (2 * aspect) * cols)),
+      Math.min(cols - 1, Math.ceil((x + R + aspect) / (2 * aspect) * cols)),
+      Math.max(1, Math.floor((1 - (y + R)) / 2 * rows)),
+      Math.min(rows - 1, Math.ceil((1 - (y - R)) / 2 * rows)),
+    ];
+  }
+
   update(dt) {
     if (!this.mesh) return;
     const { n, W, dx, dy, vx, vy, base, pinned } = this;
@@ -247,10 +254,7 @@ export default class SquishyMirror {
       const held = now - g.t0, dl = Math.hypot(g.Dx, g.Dy);
       const bulge = (1 - Math.min(1, dl / 0.06)) * Math.min(0.11, 0.03 + held * 0.05);
       // only visit vertices near the grab origin
-      const i0 = Math.max(1, Math.floor((g.ox - R + this.aspect) / (2 * this.aspect) * this.cols));
-      const i1 = Math.min(this.cols - 1, Math.ceil((g.ox + R + this.aspect) / (2 * this.aspect) * this.cols));
-      const j0 = Math.max(1, Math.floor((1 - (g.oy + R)) / 2 * this.rows));
-      const j1 = Math.min(this.rows - 1, Math.ceil((1 - (g.oy - R)) / 2 * this.rows));
+      const [i0, i1, j0, j1] = this.near(g.ox, g.oy, R);
       for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
         const k = j * W + i;
         const rx = base[k * 3] - g.ox, ry = base[k * 3 + 1] - g.oy;

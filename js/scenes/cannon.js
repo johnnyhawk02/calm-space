@@ -17,7 +17,7 @@
  * when it lands (pitch from how high up the screen it lands).
  */
 import * as THREE from 'three';
-import { clamp, damp, RateLimiter } from '../util.js';
+import { clamp, damp, RateLimiter, holdButton } from '../util.js';
 import SquishyMirror from './mirror.js';
 
 const MAX_BALLS = 12;
@@ -83,12 +83,9 @@ export default class BubbleCannon extends SquishyMirror {
     const b = this.button = document.createElement('button');
     b.id = 'firebtn';
     b.setAttribute('aria-label', 'Fire a ball');
-    const start = (e) => { e.preventDefault(); if (this.firing) return; this.firing = true; b.classList.add('down'); this.fire(); this.fireWait = FIRE_EVERY; };
-    const stop = () => { this.firing = false; b.classList.remove('down'); };
-    b.addEventListener('pointerdown', start);
-    ['pointerup', 'pointercancel', 'pointerleave'].forEach((t) => b.addEventListener(t, stop));
-    b.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) start(e); });
-    b.addEventListener('keyup', stop);
+    holdButton(b,
+      () => { if (this.firing) return; this.firing = true; b.classList.add('down'); this.fire(); this.fireWait = FIRE_EVERY; },
+      () => { this.firing = false; b.classList.remove('down'); });
     document.body.appendChild(b);
   }
 
@@ -127,16 +124,12 @@ export default class BubbleCannon extends SquishyMirror {
 
   /** Press the sheet in around (x, y): neighbours are pulled towards the hit, then spring back. */
   dent(x, y) {
-    const { W, base, vx, vy, pinned } = this;
+    const { W, base, vx, vy } = this;
     const R = HIT_SIGMA * 3, inv = 1 / (2 * HIT_SIGMA * HIT_SIGMA);
-    const i0 = Math.max(1, Math.floor((x - R + this.aspect) / (2 * this.aspect) * this.cols));
-    const i1 = Math.min(this.cols - 1, Math.ceil((x + R + this.aspect) / (2 * this.aspect) * this.cols));
-    const j0 = Math.max(1, Math.floor((1 - (y + R)) / 2 * this.rows));
-    const j1 = Math.min(this.rows - 1, Math.ceil((1 - (y - R)) / 2 * this.rows));
+    const [i0, i1, j0, j1] = this.near(x, y, R);
     const push = HIT_PUSH * (this.s.reducedMotion ? 0.6 : 1);
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-      const k = j * W + i;
-      if (pinned[k]) continue;
+      const k = j * W + i;     // near() only covers inner (unpinned) vertices
       const rx = base[k * 3] - x, ry = base[k * 3 + 1] - y;
       const w = Math.exp(-(rx * rx + ry * ry) * inv);
       if (w < 0.004) continue;

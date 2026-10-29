@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { AudioEngine } from './audio.js';
 import { Input } from './input.js';
+import { FxPanel } from './fxpanel.js';
 import { THEMES, disposeObject, smoothstep } from './util.js';
 
 // ---------------------------------------------------------------------------
@@ -144,7 +145,7 @@ async function switchTo(index, { instant = false } = {}) {
   current = s; currentIndex = index;
   settings.lastScene = index; saveSettings();
   updateNavActive();
-  buildFxPanel(index);
+  fxPanel.build(SCENES[index], index);
   audio.setAmbient(settings.ambient && audio.ready, SCENES[index].ambient);
   // Render one frame under the veil so the reveal shows a finished scene.
   s.update(1 / 60, sceneTime);
@@ -238,7 +239,7 @@ function updateNavActive() {
   navButtons.forEach((b, i) => { b.classList.toggle('active', i === currentIndex); b.setAttribute('aria-pressed', i === currentIndex); });
 }
 function showNav() {
-  wakeFx();
+  fxPanel.wake();
   if (settings.lock) return;
   nav.classList.remove('hidden');
   clearTimeout(navTimer);
@@ -247,7 +248,7 @@ function showNav() {
 }
 function revealNavIfBottom(p) {
   if (!settings.lock && nav.classList.contains('hidden') && p.y > window.innerHeight - 110) showNav();
-  if (p.x > window.innerWidth - 110) wakeFx();
+  if (p.x > window.innerWidth - 110) fxPanel.wake();
 }
 navButtons.forEach((b) => b.addEventListener('click', () => {
   showNav();
@@ -271,89 +272,9 @@ muteBtn.addEventListener('click', () => {
 
 
 // ---------------------------------------------------------------------------
-// Sound sliders (right-hand side): three per scene, each driving one effect.
-// Custom vertical sliders (large touch targets, work in every iPad Safari);
-// values are saved per scene. Moving a slider plays a soft preview bell so
-// the change is heard straight away.
+// Sound sliders (right-hand side): three per scene, see fxpanel.js.
 // ---------------------------------------------------------------------------
-const FX_ICONS = {
-  echo: '<circle cx="5" cy="12" r="2.6"/><circle cx="12" cy="12" r="2" opacity=".65"/><circle cx="18.5" cy="12" r="1.5" opacity=".35"/>',
-  space: '<path d="M3 19a9 9 0 0 1 18 0M7 19a5 5 0 0 1 10 0"/><circle cx="12" cy="19" r="1"/>',
-  shimmer: '<path d="M12 3l1.8 6.2L20 11l-6.2 1.8L12 19l-1.8-6.2L4 11l6.2-1.8z"/>',
-  warmth: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/>',
-  sparkle: '<path d="M8 3l1 3 3 1-3 1-1 3-1-3-3-1 3-1zM16 11l1.3 3.7 3.7 1.3-3.7 1.3L16 21l-1.3-3.7-3.7-1.3 3.7-1.3z"/>',
-  wobble: '<path d="M2 12c2.5-6 5-6 7.5 0s5 6 7.5 0 3.5-5 5-3"/>',
-  pitch: '<path d="M7 20V4M3.5 7.5L7 4l3.5 3.5M17 4v16M13.5 16.5L17 20l3.5-3.5"/>',
-  ring: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.8 1.8H4.2z"/><path d="M10 21h4"/>',
-};
-const FX_LABELS = { echo: 'Echo', space: 'Space', shimmer: 'Shimmer', warmth: 'Warmth', sparkle: 'Sparkle', wobble: 'Wobble', pitch: 'Pitch', ring: 'Ring length' };
-const fxPanel = document.getElementById('fx');
-let fxTimer = 0, previewAt = 0;
-
-function fxValues(index) {
-  const sc = SCENES[index];
-  const saved = settings.fx && settings.fx[sc.id];
-  return sc.fx.map(([, def], i) => (saved && typeof saved[i] === 'number' ? saved[i] : def));
-}
-function applyFx(index) {
-  const sc = SCENES[index], vals = fxValues(index);
-  const fx = { echoTime: sc.echoTime };
-  sc.fx.forEach(([key], i) => { fx[key] = vals[i]; });
-  audio.setFx(fx);
-}
-function buildFxPanel(index) {
-  applyFx(index);
-  const sc = SCENES[index], vals = fxValues(index), pal = THEMES[settings.theme] || THEMES.neon;
-  fxPanel.innerHTML = '';
-  sc.fx.forEach(([key], i) => {
-    const el = document.createElement('div');
-    el.className = 'fx-slider';
-    el.setAttribute('role', 'slider'); el.setAttribute('tabindex', '0');
-    el.setAttribute('aria-label', FX_LABELS[key]); el.setAttribute('aria-orientation', 'vertical');
-    el.setAttribute('aria-valuemin', '0'); el.setAttribute('aria-valuemax', '100');
-    el.style.setProperty('--c', pal.colors[(index + i * 2) % pal.colors.length]);
-    el.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${FX_ICONS[key]}</svg><div class="track"><div class="fill"></div><div class="thumb"></div></div>`;
-    const track = el.querySelector('.track');
-    const set = (v, preview) => {
-      v = Math.min(1, Math.max(0, v));
-      el.style.setProperty('--v', v);
-      el.setAttribute('aria-valuenow', Math.round(v * 100));
-      vals[i] = v;
-      settings.fx = { ...settings.fx, [sc.id]: [...vals] };
-      applyFx(index);
-      if (preview) previewFx();
-    };
-    const fromY = (y) => { const r = track.getBoundingClientRect(); return 1 - (y - r.top) / r.height; };
-    el.addEventListener('pointerdown', (e) => {
-      e.preventDefault(); e.stopPropagation();
-      try { el.setPointerCapture(e.pointerId); } catch (err) { /* ok */ }
-      el.classList.add('active'); wakeFx(); audio.unlock();
-      set(fromY(e.clientY), true);
-    });
-    el.addEventListener('pointermove', (e) => { if (el.classList.contains('active')) { set(fromY(e.clientY), true); wakeFx(); } });
-    const end = () => { if (el.classList.contains('active')) { el.classList.remove('active'); saveSettings(); } };
-    el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end); el.addEventListener('lostpointercapture', end);
-    el.addEventListener('keydown', (e) => {
-      const d = { ArrowUp: 0.05, ArrowRight: 0.05, ArrowDown: -0.05, ArrowLeft: -0.05 }[e.key];
-      if (d) { e.preventDefault(); set(vals[i] + d, true); saveSettings(); }
-    });
-    set(vals[i], false);
-    fxPanel.appendChild(el);
-  });
-}
-/** A soft bell through the current effects, at most ~4 per second while dragging. */
-function previewFx() {
-  const now = performance.now();
-  if (now - previewAt < 260) return;
-  previewAt = now;
-  audio.chime(audio.freq(9 + ((now / 260) | 0) % 3), 0.28, 0.6, 0.3, 1.4);
-}
-function wakeFx() {
-  fxPanel.classList.remove('dim');
-  clearTimeout(fxTimer);
-  fxTimer = setTimeout(() => fxPanel.classList.add('dim'), 4000);
-}
-function applyFxPanel() { fxPanel.hidden = !settings.fxPanel; }
+const fxPanel = new FxPanel(document.getElementById('fx'), audio, settings, saveSettings);
 
 // ---------------------------------------------------------------------------
 // Parent settings: opened by a 3-second press-and-hold on the corner dot.
@@ -404,7 +325,7 @@ function closeSettings() {
   if (snapshot.windDown !== settings.windDown) windStart = performance.now();
   saveSettings();
   applyLock();
-  applyFxPanel();
+  fxPanel.applyVisibility();
   if (needsReload) reloadScene();
   else audio.setAmbient(settings.ambient && audio.ready, SCENES[currentIndex].ambient);
   if (!settings.lock) showNav();
@@ -462,7 +383,7 @@ canvas.addEventListener('pointerdown', () => { if (!audio.ready || audio.ctx?.st
 // ---------------------------------------------------------------------------
 updateMute();
 applyLock();
-applyFxPanel();
+fxPanel.applyVisibility();
 reducedMotionMQ.addEventListener?.('change', reloadScene);
 switchTo(settings.lastScene || 0, { instant: true }).then(() => startLoop());
 
