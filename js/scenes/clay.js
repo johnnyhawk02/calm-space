@@ -24,7 +24,7 @@
  * (marimba), the round button rings a gentle bell.
  */
 import * as THREE from 'three';
-import { makeBackdrop, ndcRay, clamp, visibleSize, RateLimiter } from '../util.js';
+import { makeBackdrop, ndcRay, clamp, visibleSize, RateLimiter, sidePad, iconButton, holdButton } from '../util.js';
 
 const MAX_GRABS = 5;
 const K = 55, C = 3.2;          // elastic spring (under-damped → squishy wobble)
@@ -124,32 +124,23 @@ export default class SquishyClay {
 
   // ---- on-screen rotate controls -----------------------------------------
   buildControls() {
-    const pad = this.pad = document.createElement('div');
-    pad.id = 'rotpad';
-    pad.setAttribute('aria-label', 'Turn the clay');
+    const pad = this.pad = sidePad('rotpad', 'Turn the clay');
     const defs = [
       ['up', 'Turn up', [-1, 0, 0]], ['left', 'Turn left', [0, -1, 0]], ['round', 'Make it round again', null],
       ['right', 'Turn right', [0, 1, 0]], ['down', 'Turn down', [1, 0, 0]],
     ];
     for (const [key, label, ax] of defs) {
-      const b = document.createElement('button');
-      b.className = 'icon-btn';
-      b.setAttribute('aria-label', label);
-      b.innerHTML = `<svg viewBox="0 0 36 36">${ICONS[key]}</svg>`;
+      const b = iconButton(label, ICONS[key]);
       if (ax) {
         const v = new THREE.Vector3(...ax);
-        const start = (e) => { e.preventDefault(); this.rotators.push(v); this._spinTarget(); this.quietT = 0; this.audio.marimba(this.audio.freq(ax[1] ? 7 : 9), 0.22, ax[1] * 0.5, 0.2); };
-        const stop = () => { const i = this.rotators.indexOf(v); if (i >= 0) { this.rotators.splice(i, 1); this._spinTarget(); } };
-        b.addEventListener('pointerdown', start);
-        ['pointerup', 'pointercancel', 'pointerleave'].forEach((t) => b.addEventListener(t, stop));
-        b.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) start(e); });
-        b.addEventListener('keyup', stop);
+        holdButton(b,
+          () => { this.rotators.push(v); this._spinTarget(); this.quietT = 0; this.audio.marimba(this.audio.freq(ax[1] ? 7 : 9), 0.22, ax[1] * 0.5, 0.2); },
+          () => { const i = this.rotators.indexOf(v); if (i >= 0) { this.rotators.splice(i, 1); this._spinTarget(); } });
       } else {
         b.addEventListener('click', () => { this.resetT = 2.5; this.audio.chime(this.audio.freq(10), 0.3, 0, 0.3, 1.8); });
       }
       pad.appendChild(b);
     }
-    document.body.appendChild(pad);
   }
   _spinTarget() {
     this.spinTarget.set(0, 0, 0);

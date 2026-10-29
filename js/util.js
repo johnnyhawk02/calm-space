@@ -113,11 +113,6 @@ export function makeBackdrop(palette) {
   return mesh;
 }
 
-/** A soft round sprite texture-free shader snippet (returns alpha for a point/quad uv). */
-export const SOFT_DISC_GLSL = /* glsl */`
-  float softDisc(vec2 uv) { float d = length(uv - 0.5) * 2.0; return smoothstep(1.0, 0.0, d) * smoothstep(1.0, 0.55, d) ; }
-`;
-
 /** Simple rate limiter: returns true at most `perSecond` times per second (token bucket). */
 export class RateLimiter {
   constructor(perSecond, burst = 2) { this.rate = perSecond; this.burst = burst; this.tokens = burst; this.last = 0; }
@@ -127,4 +122,39 @@ export class RateLimiter {
     if (this.tokens >= 1) { this.tokens -= 1; return true; }
     return false;
   }
+}
+
+// ---------------------------------------------------------------------------
+// On-screen controls that some scenes add (clay turn pad, camera switch, fire
+// button). Each scene removes its own elements in dispose().
+// ---------------------------------------------------------------------------
+
+/** A rounded panel on the left edge (styled by #rotpad / #campad in index.html). */
+export function sidePad(id, label) {
+  const pad = document.createElement('div');
+  pad.id = id;
+  if (label) pad.setAttribute('aria-label', label);
+  document.body.appendChild(pad);
+  return pad;
+}
+
+/** A round icon button; `svg` is the inner markup of a 36×36 viewBox. */
+export function iconButton(label, svg) {
+  const b = document.createElement('button');
+  b.className = 'icon-btn';
+  b.setAttribute('aria-label', label);
+  b.innerHTML = `<svg viewBox="0 0 36 36">${svg}</svg>`;
+  return b;
+}
+
+/**
+ * Press-and-hold behaviour: `start` on finger down (or Enter/Space), `stop` when
+ * the finger lifts, is cancelled or slides off (or the key is released).
+ */
+export function holdButton(el, start, stop) {
+  const down = (e) => { e.preventDefault(); start(e); };
+  el.addEventListener('pointerdown', down);
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach((t) => el.addEventListener(t, stop));
+  el.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) down(e); });
+  el.addEventListener('keyup', stop);
 }

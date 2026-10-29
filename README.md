@@ -116,8 +116,9 @@ sw.js                 precaches every file; cache-first, works offline
 js/main.js            renderer, render loop, adaptive pixel ratio, scene manager, settings, nav
 js/input.js           unified Pointer Events multitouch (≤ 10 pointers: position, velocity, pressure)
 js/audio.js           procedural Web Audio engine (chime, marimba, bubble, drop, squish, pads)
-js/util.js            themes, disposal, screen→world helpers, backdrop, rate limiter
-js/scenes/*.js        one file per scene
+js/fxpanel.js         the three per-scene sound sliders on the right
+js/util.js            themes, disposal, screen→world helpers, backdrop, rate limiter, on-screen button helpers
+js/scenes/*.js        one file per scene (cannon.js builds on mirror.js's camera sheet)
 vendor/three.module.js  Three.js r170 (minified ES-module build), served locally
 icons/                apple-touch-icon (180), 192, 512 and a maskable 512
 ```
